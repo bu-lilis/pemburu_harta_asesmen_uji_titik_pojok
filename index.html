@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pemburu Harta: Misi Titik Ekstrem</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Nunito:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: radial-gradient(circle at center, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: #e94560;
+            overflow-x: hidden;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        h1, h2, h3, .tech-font {
+            font-family: 'Chakra Petch', sans-serif;
+        }
+
+        .glass-panel {
+            background: rgba(22, 33, 62, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(233, 69, 96, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        canvas {
+            background: #0f172a; /* Slate 900 */
+            border-radius: 12px;
+            border: 2px solid #e94560;
+            box-shadow: 0 0 20px rgba(233, 69, 96, 0.4);
+            width: 100%;
+            max-width: 500px;
+            cursor: crosshair;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .btn-hover-effect {
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+        .btn-hover-effect:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px rgba(233, 69, 96, 0.4);
+        }
+        .btn-hover-effect:active {
+            transform: translateY(0);
+        }
+
+        /* Modal styling */
+        #modal-overlay {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(6px);
+        }
+
+        /* Point animation */
+        @keyframes pulse-point {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.5; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center p-4">
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="glass-panel p-8 rounded-2xl max-w-2xl w-full text-center">
+        <div class="text-6xl text-pink-500 mb-4"><i class="fa-solid fa-map-location-dot"></i></div>
+        <h1 class="text-4xl md:text-5xl font-bold mb-4 tech-font text-white uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-500">Pemburu Harta</h1>
+        <h2 class="text-xl mb-6 text-gray-300 tech-font">Misi: Uji Titik Pojok (Program Linear)</h2>
+        
+        <div class="bg-slate-800 p-6 rounded-xl text-left text-gray-300 mb-8 border border-slate-600">
+            <p class="mb-3"><b>Selamat datang, Agen Penjelajah!</b> Harta karun tersembunyi di dalam "Daerah Penyelesaian" pada peta radar.</p>
+            <p class="mb-3"><b>Misi Anda memiliki 2 Fase:</b></p>
+            <ul class="list-disc pl-6 space-y-2">
+                <li><b>Fase 1: Pindai Radar.</b> Temukan dan klik semua <b>Titik Pojok</b> dari zona aman (daerah yang diarsir).</li>
+                <li><b>Fase 2: Uji Ekstrem.</b> Gunakan Mesin Fungsi Objektif <code class="bg-slate-700 px-2 py-1 rounded text-pink-400">f(x,y) = ax + by</code> untuk menemukan titik mana yang menyimpan harta paling maksimal atau minimal!</li>
+            </ul>
+        </div>
+
+        <button onclick="startGame()" class="btn-hover-effect bg-gradient-to-r from-pink-600 to-purple-600 text-white font-bold py-3 px-10 rounded-full text-xl w-full md:w-auto tech-font uppercase tracking-wide">
+            <i class="fa-solid fa-play mr-2"></i> Mulai Pencarian
+        </button>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="hidden glass-panel p-6 rounded-2xl max-w-3xl w-full">
+        <!-- Header HUD -->
+        <div class="flex justify-between items-end mb-4 border-b border-pink-500/30 pb-4">
+            <div>
+                <span class="text-gray-400 text-sm block tech-font">LEVEL</span>
+                <span id="level-display" class="tech-font text-2xl font-bold text-white">1 / 3</span>
+            </div>
+            <div class="text-center">
+                <span id="phase-badge" class="bg-pink-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest tech-font">Fase 1: Cari Titik</span>
+            </div>
+            <div class="text-right">
+                <span class="text-gray-400 text-sm block tech-font">SKOR</span>
+                <span id="score-display" class="tech-font text-2xl font-bold text-yellow-400">0</span>
+            </div>
+        </div>
+
+        <p id="instruction-text" class="text-center text-gray-200 mb-4 font-semibold">
+            Klik pada area grafik untuk menemukan semua <span class="text-pink-400">Titik Pojok</span> dari zona yang diarsir!
+        </p>
+
+        <!-- Main Radar (Canvas) -->
+        <div class="relative mb-6">
+            <canvas id="gameCanvas" width="500" height="400"></canvas>
+            <div id="tooltip" class="absolute hidden bg-slate-800 text-xs px-2 py-1 rounded border border-pink-500 text-white pointer-events-none z-10 transition-opacity"></div>
+        </div>
+
+        <!-- Controls: Phase 2 (Evaluation) -->
+        <div id="controls-phase-2" class="hidden w-full flex flex-col items-center animate-fade-in">
+            <div class="bg-slate-800 p-4 rounded-xl border border-blue-400 w-full mb-4 text-center shadow-lg">
+                <h3 class="text-blue-300 tech-font text-sm uppercase mb-1">Fungsi Objektif</h3>
+                <div id="objective-function" class="text-2xl font-bold text-white tracking-wider">f(x,y) = 2x + y</div>
+                <p id="objective-goal" class="text-yellow-400 font-bold mt-2 animate-pulse">Temukan Nilai MAKSIMUM!</p>
+            </div>
+
+            <p class="text-gray-300 mb-3 text-sm">Pilih titik yang memberikan nilai sesuai target di atas:</p>
+            
+            <div id="point-buttons" class="grid grid-cols-2 md:grid-cols-4 gap-3 w-full">
+                <!-- Buttons injected via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- End Screen -->
+    <div id="end-screen" class="hidden glass-panel p-8 rounded-2xl max-w-2xl w-full text-center">
+        <div class="text-6xl text-yellow-400 mb-4"><i class="fa-solid fa-crown"></i></div>
+        <h1 class="text-4xl font-bold mb-2 tech-font text-white">Misi Selesai!</h1>
+        <p class="text-lg text-gray-300 mb-6">Laporan hasil eksplorasimu telah diproses.</p>
+        
+        <div class="bg-slate-900 p-6 rounded-xl mb-8 border border-slate-600 shadow-inner">
+            <h3 class="text-xl font-bold text-gray-400 mb-2 tech-font uppercase">Total Skor</h3>
+            <div id="final-score" class="text-7xl font-bold text-pink-500 tech-font drop-shadow-[0_0_10px_rgba(233,69,96,0.8)]">0</div>
+        </div>
+
+        <p id="feedback-text" class="mb-8 text-lg text-gray-200"></p>
+
+        <button onclick="location.reload()" class="btn-hover-effect bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-full text-lg tech-font">
+            <i class="fa-solid fa-rotate-right mr-2"></i> Jalankan Misi Baru
+        </button>
+    </div>
+
+    <!-- Custom Modal Overlay -->
+    <div id="modal-overlay" class="fixed inset-0 hidden items-center justify-center z-50">
+        <div id="modal-content" class="bg-slate-800 border-l-4 border-pink-500 p-6 rounded-r-2xl max-w-sm w-full shadow-2xl transform transition-all scale-90 opacity-0">
+            <div class="flex items-center gap-4 mb-4">
+                <div id="modal-icon" class="text-4xl"></div>
+                <h2 id="modal-title" class="text-2xl font-bold tech-font text-white"></h2>
+            </div>
+            <p id="modal-text" class="text-gray-300 mb-6 leading-relaxed"></p>
+            <button onclick="closeModal()" class="w-full bg-pink-600 hover:bg-pink-500 text-white font-bold py-2 px-4 rounded-lg transition tech-font uppercase tracking-wider">Lanjutkan</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Game Configuration & Data ---
+        const levels = [
+            {
+                // Level 1: Segitiga
+                points: [{x: 2, y: 2}, {x: 8, y: 2}, {x: 2, y: 7}],
+                obj: { a: 3, b: 2, text: "f(x,y) = 3x + 2y", type: "max" }
+            },
+            {
+                // Level 2: Segi empat
+                points: [{x: 1, y: 1}, {x: 7, y: 1}, {x: 6, y: 5}, {x: 2, y: 6}],
+                obj: { a: 2, b: 5, text: "f(x,y) = 2x + 5y", type: "max" }
+            },
+            {
+                // Level 3: Segi lima (Minimize)
+                points: [{x: 4, y: 2}, {x: 8, y: 4}, {x: 7, y: 8}, {x: 3, y: 7}, {x: 1, y: 4}],
+                obj: { a: 4, b: 3, text: "f(x,y) = 4x + 3y", type: "min" }
+            }
+        ];
+
+        let currentLevel = 0;
+        let score = 0;
+        let foundPoints = []; // Stores indices of found points in current level
+        let phase = 1; // 1: Find points, 2: Calculate obj
+
+        // --- Canvas Setup ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        const padding = 40;
+        const dataMaxX = 10;
+        const dataMaxY = 10;
+
+        // Coordinate mapping functions
+        function mapX(x) { return padding + (x / dataMaxX) * (width - padding * 2); }
+        function mapY(y) { return height - padding - (y / dataMaxY) * (height - padding * 2); }
+        // Reverse mapping (pixels to logic coordinates)
+        function unmapX(px) { return ((px - padding) / (width - padding * 2)) * dataMaxX; }
+        function unmapY(py) { return ((height - padding - py) / (height - padding * 2)) * dataMaxY; }
+
+        // --- Drawing Logic ---
+        function drawScene() {
+            ctx.clearRect(0, 0, width, height);
+            
+            // 1. Draw Grid
+            ctx.strokeStyle = "rgba(255,255,255,0.05)";
+            ctx.lineWidth = 1;
+            for(let i=0; i<=10; i++) {
+                ctx.beginPath(); ctx.moveTo(mapX(i), mapY(0)); ctx.lineTo(mapX(i), mapY(10)); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(mapX(0), mapY(i)); ctx.lineTo(mapX(10), mapY(i)); ctx.stroke();
+            }
+
+            // 2. Draw Axes
+            ctx.strokeStyle = "#94a3b8";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(mapX(0), mapY(10.5)); // Y axis extended slightly
+            ctx.lineTo(mapX(0), mapY(0));
+            ctx.lineTo(mapX(10.5), mapY(0)); // X axis extended slightly
+            ctx.stroke();
+
+            // Axes Labels & Numbers
+            ctx.fillStyle = "#94a3b8";
+            ctx.font = "12px Nunito";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "top";
+            for(let i=1; i<=10; i+=2) {
+                ctx.fillText(i, mapX(i), mapY(0) + 5);
+                ctx.fillText(i, mapX(0) - 15, mapY(i) - 6);
+            }
+            ctx.fillText("X", width - 15, mapY(0) + 5);
+            ctx.fillText("Y", mapX(0) - 15, 10);
+
+            // 3. Draw Feasible Region (Polygon)
+            const pts = levels[currentLevel].points;
+            if (pts.length > 0) {
+                ctx.beginPath();
+                ctx.moveTo(mapX(pts[0].x), mapY(pts[0].y));
+                for(let i=1; i<pts.length; i++) {
+                    ctx.lineTo(mapX(pts[i].x), mapY(pts[i].y));
+                }
+                ctx.closePath();
+                
+                // Fill with glowing effect
+                let gradient = ctx.createLinearGradient(0, height, width, 0);
+                gradient.addColorStop(0, "rgba(233, 69, 96, 0.2)");
+                gradient.addColorStop(1, "rgba(162, 28, 175, 0.4)");
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                
+                // Border
+                ctx.strokeStyle = "#e94560";
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]); // Dashed border for "hologram" look
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // 4. Draw Found Points
+            pts.forEach((p, index) => {
+                if (foundPoints.includes(index) || phase === 2) {
+                    ctx.beginPath();
+                    ctx.arc(mapX(p.x), mapY(p.y), 6, 0, Math.PI * 2);
+                    ctx.fillStyle = "#facc15"; // yellow-400
+                    ctx.fill();
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    // Label point if phase 2
+                    if (phase === 2) {
+                        ctx.fillStyle = "#ffffff";
+                        ctx.font = "bold 14px Chakra Petch";
+                        ctx.fillText(`(${p.x}, ${p.y})`, mapX(p.x), mapY(p.y) - 15);
+                    }
+                }
+            });
+        }
+
+        // --- Game Flow ---
+        function startGame() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            score = 0;
+            currentLevel = 0;
+            updateScore();
+            loadLevel();
+        }
+
+        function loadLevel() {
+            if (currentLevel >= levels.length) {
+                endGame();
+                return;
+            }
+            
+            phase = 1;
+            foundPoints = [];
+            
+            // UI Resets
+            document.getElementById('level-display').innerText = `${currentLevel + 1} / ${levels.length}`;
+            document.getElementById('phase-badge').innerText = "Fase 1: Cari Titik";
+            document.getElementById('phase-badge').className = "bg-pink-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest tech-font";
+            document.getElementById('instruction-text').innerHTML = `Klik pada area grafik untuk menemukan <b class="text-pink-400">${levels[currentLevel].points.length} Titik Pojok</b>!`;
+            document.getElementById('controls-phase-2').classList.add('hidden');
+            
+            drawScene();
+        }
+
+        function startPhase2() {
+            phase = 2;
+            const lvl = levels[currentLevel];
+            
+            // Update UI
+            document.getElementById('phase-badge').innerText = "Fase 2: Uji Ekstrem";
+            document.getElementById('phase-badge').className = "bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest tech-font";
+            document.getElementById('instruction-text').innerHTML = `Hitung nilai <b class="text-blue-400">f(x,y)</b> untuk setiap titik pojok yang ditemukan.`;
+            
+            document.getElementById('objective-function').innerText = lvl.obj.text;
+            document.getElementById('objective-goal').innerText = `Temukan Nilai ${lvl.obj.type === 'max' ? 'MAKSIMUM' : 'MINIMUM'}!`;
+            document.getElementById('controls-phase-2').classList.remove('hidden');
+
+            // Generate Buttons
+            const btnContainer = document.getElementById('point-buttons');
+            btnContainer.innerHTML = '';
+            
+            lvl.points.forEach((p, idx) => {
+                const btn = document.createElement('button');
+                btn.className = "btn-hover-effect bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-2 rounded-lg border border-slate-500 tech-font";
+                btn.innerText = `Titik (${p.x}, ${p.y})`;
+                btn.onclick = () => checkAnswer(idx);
+                btnContainer.appendChild(btn);
+            });
+
+            drawScene(); // Redraw to show labels
+        }
+
+        // --- Interaction Logic ---
+        canvas.addEventListener('click', (e) => {
+            if (phase !== 1) return; // Only allow clicking in phase 1
+
+            const rect = canvas.getBoundingClientRect();
+            // Scale mouse coordinates to match canvas internal resolution
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            const mouseX = (e.clientX - rect.left) * scaleX;
+            const mouseY = (e.clientY - rect.top) * scaleY;
+
+            const logicX = unmapX(mouseX);
+            const logicY = unmapY(mouseY);
+
+            // Check if click is near any point (tolerance radius 0.8 logic units)
+            let clickedPoint = false;
+            const pts = levels[currentLevel].points;
+            
+            for (let i = 0; i < pts.length; i++) {
+                const p = pts[i];
+                const dist = Math.sqrt(Math.pow(p.x - logicX, 2) + Math.pow(p.y - logicY, 2));
+                
+                if (dist < 0.8) { // Click is close enough
+                    if (!foundPoints.includes(i)) {
+                        foundPoints.push(i);
+                        drawScene(); // Update visual
+                        
+                        // Check if all points found
+                        if (foundPoints.length === pts.length) {
+                            setTimeout(() => {
+                                showModal(
+                                    "Radar Selesai!",
+                                    "<i class='fa-solid fa-satellite-dish text-pink-500'></i>",
+                                    "Kamu telah menemukan semua titik pojok. Sekarang mari kita uji titik-titik tersebut!",
+                                    startPhase2
+                                );
+                            }, 300);
+                        }
+                    }
+                    clickedPoint = true;
+                    break;
+                }
+            }
+
+            if(!clickedPoint) {
+                // Flash canvas border red for wrong click
+                canvas.style.borderColor = "red";
+                setTimeout(() => canvas.style.borderColor = "#e94560", 200);
+            }
+        });
+
+        // Hover tooltip logic
+        canvas.addEventListener('mousemove', (e) => {
+            if (phase !== 1) {
+                document.getElementById('tooltip').classList.add('hidden');
+                return;
+            }
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const mouseX = (e.clientX - rect.left) * scaleX;
+            const mouseY = (e.clientY - rect.top) * scaleY;
+            const logicX = unmapX(mouseX);
+            const logicY = unmapY(mouseY);
+
+            if (logicX >= 0 && logicX <= 10 && logicY >= 0 && logicY <= 10) {
+                const tooltip = document.getElementById('tooltip');
+                tooltip.style.left = (e.clientX - rect.left + 15) + 'px';
+                tooltip.style.top = (e.clientY - rect.top + 15) + 'px';
+                tooltip.innerHTML = `(${logicX.toFixed(1)}, ${logicY.toFixed(1)})`;
+                tooltip.classList.remove('hidden');
+            } else {
+                document.getElementById('tooltip').classList.add('hidden');
+            }
+        });
+        canvas.addEventListener('mouseleave', () => document.getElementById('tooltip').classList.add('hidden'));
+
+        // Logic Phase 2: Check Math Answer
+        function checkAnswer(selectedIndex) {
+            const lvl = levels[currentLevel];
+            const pts = lvl.points;
+            const a = lvl.obj.a;
+            const b = lvl.obj.b;
+            const isMax = lvl.obj.type === 'max';
+
+            // Calculate values for all points
+            let values = pts.map(p => ({
+                x: p.x, y: p.y,
+                val: (a * p.x) + (b * p.y)
+            }));
+
+            // Find optimal value
+            let optimalVal = isMax ? -Infinity : Infinity;
+            values.forEach(v => {
+                if (isMax ? v.val > optimalVal : v.val < optimalVal) {
+                    optimalVal = v.val;
+                }
+            });
+
+            const userPoint = pts[selectedIndex];
+            const userVal = (a * userPoint.x) + (b * userPoint.y);
+
+            let explanation = `Nilai pada titik yang kamu pilih (${userPoint.x}, ${userPoint.y}):<br><code class="text-pink-400 font-bold bg-slate-900 px-2 py-1 rounded block mt-2 text-center text-lg">${a}(${userPoint.x}) + ${b}(${userPoint.y}) = ${userVal}</code><br>`;
+            
+            if (userVal === optimalVal) {
+                // Correct
+                score += 100;
+                updateScore();
+                
+                showModal(
+                    "Pilihan Tepat!",
+                    "<i class='fa-solid fa-check-circle text-green-500'></i>",
+                    explanation + `<br>Bagus! Nilai ${optimalVal} adalah nilai ${isMax ? 'maksimum' : 'minimum'} yang tepat. Harta diamankan!`,
+                    () => {
+                        currentLevel++;
+                        loadLevel();
+                    }
+                );
+            } else {
+                // Incorrect
+                let correctPointsText = values.map(v => `(${v.x},${v.y}) &rarr; ${v.val}`).join('<br>');
+                
+                showModal(
+                    "Kurang Tepat!",
+                    "<i class='fa-solid fa-triangle-exclamation text-yellow-500'></i>",
+                    explanation + `<br>Coba perhatikan hitungan titik lainnya:<br><div class="bg-slate-900 p-2 rounded mt-2 text-sm">${correctPointsText}</div><br>Target kita adalah nilai <b>${isMax ? 'Maksimum' : 'Minimum'}</b> (${optimalVal}).`,
+                    () => {
+                        currentLevel++;
+                        loadLevel();
+                    }
+                );
+            }
+        }
+
+        function updateScore() {
+            document.getElementById('score-display').innerText = score;
+        }
+
+        function endGame() {
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('end-screen').classList.remove('hidden');
+            
+            // Score animation
+            let finalEl = document.getElementById('final-score');
+            let current = 0;
+            let timer = setInterval(() => {
+                current += 10;
+                if(current >= score) {
+                    current = score;
+                    clearInterval(timer);
+                }
+                finalEl.innerText = current;
+            }, 30);
+
+            const feedback = document.getElementById('feedback-text');
+            if (score === 300) {
+                feedback.innerHTML = "Sempurna! Pemahamanmu tentang <b>Metode Uji Titik Pojok</b> sangat luar biasa. Kamu siap memecahkan masalah Program Linear apapun!";
+                feedback.className = "mb-8 text-xl font-bold text-green-400";
+            } else if (score >= 100) {
+                feedback.innerHTML = "Cukup bagus! Kamu sudah mengerti konsep dasarnya. Hanya perlu sedikit lebih teliti saat memasukkan angka ke fungsi objektif.";
+                feedback.className = "mb-8 text-xl font-bold text-yellow-400";
+            } else {
+                feedback.innerHTML = "Jangan menyerah! Mari ingat kembali: Titik Pojok adalah batas-batas arsirannya, lalu masukkan x dan y ke fungsi objektif (f) untuk dicari yang terbesar/terkecil.";
+                feedback.className = "mb-8 text-xl font-bold text-gray-300";
+            }
+        }
+
+        // --- Custom Modal Logic ---
+        let modalCallback = null;
+        function showModal(title, iconHtml, text, callback) {
+            document.getElementById('modal-title').innerHTML = title;
+            document.getElementById('modal-icon').innerHTML = iconHtml;
+            document.getElementById('modal-text').innerHTML = text;
+            modalCallback = callback;
+            
+            const overlay = document.getElementById('modal-overlay');
+            const content = document.getElementById('modal-content');
+            
+            // Setup styles for modal border depending on result
+            if(iconHtml.includes('check')) content.className = "bg-slate-800 border-l-4 border-green-500 p-6 rounded-r-2xl max-w-sm w-full shadow-2xl transform transition-all scale-100 opacity-100";
+            else if(iconHtml.includes('exclamation')) content.className = "bg-slate-800 border-l-4 border-yellow-500 p-6 rounded-r-2xl max-w-sm w-full shadow-2xl transform transition-all scale-100 opacity-100";
+            else content.className = "bg-slate-800 border-l-4 border-pink-500 p-6 rounded-r-2xl max-w-sm w-full shadow-2xl transform transition-all scale-100 opacity-100";
+
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+            
+            // Small delay for CSS transition
+            setTimeout(() => {
+                content.classList.remove('scale-90', 'opacity-0');
+            }, 10);
+        }
+
+        function closeModal() {
+            const overlay = document.getElementById('modal-overlay');
+            const content = document.getElementById('modal-content');
+            
+            content.classList.add('scale-90', 'opacity-0');
+            
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+                overlay.classList.remove('flex');
+                if (modalCallback) modalCallback();
+            }, 200);
+        }
+
+        // Initial setup on load
+        window.onload = () => {
+            // Pre-draw an empty grid on start screen for aesthetic if desired, 
+            // but hiding game canvas is fine.
+        }
+    </script>
+</body>
+</html>
